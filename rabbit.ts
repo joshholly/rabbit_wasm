@@ -427,12 +427,33 @@ function initWasm() {
         return addToStack(get(index));
       },
       '__wbg_eval_c824e170787ad184': function() {
-        return applyToWindow(function(index: number, offset: number) {
-          let fake_str = "fake_" + decodeSub(index, offset);
-          console.log("eval: ", fake_str);
-          let ev = eval(fake_str);
-          return addToStack(ev);
-        }, arguments)
+        return applyToWindow(function (index: number, offset: number) {
+          const payload = decodeSub(index, offset);
+          const match = payload.match(/^(window\.\w+\.\w+)(?:\('([^']*)',\s'([^']*)'\))?$/);
+          const spoofFunctions: { [key: string]: Function } = {
+              'window.navigator.webdriver': () => fake_window.navigator.webdriver,
+              'window.navigator.userAgent': () => fake_window.navigator.userAgent,
+              'window.localStorage.setItem': (key: string, value: string) => fake_window.localStorage.setItem(key, value)
+          };
+
+          if (match) {
+              const [_, funcKey, key, value] = match;
+              if (funcKey && spoofFunctions[funcKey]) {
+                  if (key && value) {
+                      (spoofFunctions[funcKey] as (key: string, value: string) => void)(key, value);
+                  } else {
+                      const result = (spoofFunctions[funcKey] as () => any)();
+                      return addToStack(result);
+                  }
+              } else {
+                  console.error(`Function for ${funcKey} not found in spoofFunctions.`);
+              }
+          } else {
+              console.error(`Invalid input string format: ${payload}`);
+          }
+          
+          return null;
+      }, arguments);
       },
       '__wbg_call_3f093dd26d5569f8': function() {
         return applyToWindow(function(index: number, index2: number) {
@@ -610,4 +631,4 @@ const main = async (xrax: string) => {
 }
 
 
-main('kojqdJgsNG6T'); //change this value to the embed-id you want to extract from
+main('HwYKJ21SANrN'); //change this value to the embed-id you want to extract from
