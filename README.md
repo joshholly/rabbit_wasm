@@ -7,7 +7,7 @@ This is a NodeJS/ExpressJS script that will use decode Rabbit Stream's WASM and 
 - Clone this repo by running
 
 ```bash
-git clone https://github.com/joshholly/rabbitstream-api.git
+git clone https://github.com/joshholly/rabbitstream_api.git
 ```
 
 - Install the dependencies 
