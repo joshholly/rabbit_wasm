@@ -4,6 +4,11 @@ const embed_url = "https://rabbitstream.net/v2/embed-4/";
 const referrer = "https://flixhq.to/";
 const user_agent = "Mozilla/5.0 (X11; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0";
 
+const express = require('express');
+const app = express();
+const PORT = 3002;
+
+
 let wasm: any;
 let arr = new Array(128).fill(void 0);
 const dateNow = Date.now();
@@ -32,7 +37,7 @@ interface fakeWindow {
 }
 
 const canvas = {
-  baseUrl: "https://rabbitstream.net/v2/embed-4/mcAWNPptFcOb?z=",
+  baseUrl: "https://rabbitstream.net/v2/embed-4/KDeBr6IDhIk4?z=",
   width: 0,
   height: 0,
   style: {
@@ -58,7 +63,7 @@ const fake_window: fakeWindow = {
   },
   origin: "https://rabbitstream.net",
   location: {
-    href: "https://rabbitstream.net/v2/embed-4/mcAWNPptFcOb?z=",
+    href: "https://rabbitstream.net/v2/embed-4/KDeBr6IDhIk4?z=",
     origin: "https://rabbitstream.net",
   },
   performance: {
@@ -79,7 +84,7 @@ const nodeList = {
 }
 
 
-let script_url = "https://rabbitstream.net/v2/embed-4/z1AOmWCJVgcy?z=";
+let script_url = "https://rabbitstream.net/v2/embed-4/KDeBr6IDhIk4?z=";
 
 function get(index: number) {
   return arr[index];
@@ -427,33 +432,12 @@ function initWasm() {
         return addToStack(get(index));
       },
       '__wbg_eval_c824e170787ad184': function() {
-        return applyToWindow(function (index: number, offset: number) {
-          const payload = decodeSub(index, offset);
-          const match = payload.match(/^(window\.\w+\.\w+)(?:\('([^']*)',\s'([^']*)'\))?$/);
-          const spoofFunctions: { [key: string]: Function } = {
-              'window.navigator.webdriver': () => fake_window.navigator.webdriver,
-              'window.navigator.userAgent': () => fake_window.navigator.userAgent,
-              'window.localStorage.setItem': (key: string, value: string) => fake_window.localStorage.setItem(key, value)
-          };
-
-          if (match) {
-              const [_, funcKey, key, value] = match;
-              if (funcKey && spoofFunctions[funcKey]) {
-                  if (key && value) {
-                      (spoofFunctions[funcKey] as (key: string, value: string) => void)(key, value);
-                  } else {
-                      const result = (spoofFunctions[funcKey] as () => any)();
-                      return addToStack(result);
-                  }
-              } else {
-                  console.error(`Function for ${funcKey} not found in spoofFunctions.`);
-              }
-          } else {
-              console.error(`Invalid input string format: ${payload}`);
-          }
-          
-          return null;
-      }, arguments);
+        return applyToWindow(function(index: number, offset: number) {
+          let fake_str = "fake_" + decodeSub(index, offset);
+          console.log("eval: ", fake_str);
+          let ev = eval(fake_str);
+          return addToStack(ev);
+        }, arguments)
       },
       '__wbg_call_3f093dd26d5569f8': function() {
         return applyToWindow(function(index: number, index2: number) {
@@ -596,11 +580,15 @@ const getMeta = async (url: string) => {
   meta.content = content;
 }
 
-const main = async (xrax: string) => {
-  await getMeta((embed_url + xrax + "?z="));
-  fake_window.xrax = xrax;
+const main = async (id) => {
+  const baseUrl = `https://rabbitstream.net/v2/embed-4/${id}?z=`;
+  const href = `https://rabbitstream.net/v2/embed-4/${id}?z=`;
+  let script_url = `https://rabbitstream.net/v2/embed-4/${id}?z=`;
+
+  await getMeta((embed_url + id + "?z="));
+  fake_window.xrax = id;
   let keys = await V();
-  let getSourcesUrl = "https://rabbitstream.net/ajax/v2/embed-4/getSources?id=" + xrax + "&v=" + fake_window.localStorage.kversion + "&h=" + fake_window.localStorage.kid + "&b=1676800512"
+  let getSourcesUrl = "https://rabbitstream.net/ajax/v2/embed-4/getSources?id=" + id + "&v=" + fake_window.localStorage.kversion + "&h=" + fake_window.localStorage.kid + "&b=1676800512"
   let resp_json = await (await fetch(getSourcesUrl, {
     "headers": {
       "User-Agent": user_agent,
@@ -628,7 +616,21 @@ const main = async (xrax: string) => {
 
   console.log("\n Decoded sources:");
   console.log(real);
+  return { resp_json, real };
 }
 
 
-main('HwYKJ21SANrN'); //change this value to the embed-id you want to extract from
+// Express route
+app.get('/api/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await main(id);
+    res.json({ decoded: result.real, captions: result.resp_json.tracks });
+  } catch (error) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
